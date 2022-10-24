@@ -3,8 +3,11 @@ import os
 from tqdm import tqdm
 import numpy as np
 
+import pytorch_lightning as pl
+
 from .environment import Environment, State
 from .mcts import MCTS
+from .nnet import NeuralNet, DataModule
 
 
 class AlphaZero:
@@ -13,7 +16,7 @@ class AlphaZero:
     in Environment and NeuralNet. args are specified in main.py.
     """
 
-    def __init__(self, environment: Environment, nnet, args):
+    def __init__(self, environment: Environment, nnet: NeuralNet, args):
         self.environment = environment
         self.nnet = nnet
         self.args = args
@@ -43,9 +46,16 @@ class AlphaZero:
 
     def learn(self):
         for i in range(1, self.args.num_iter + 1):
-            train_examples = []
+            examples = []
             for _ in tqdm(range(self.args.num_self_play_games), desc='Self-playing'):
-                train_examples += self.play()
+                examples += self.play()
 
-            self.nnet.train(train_examples)
-            self.nnet.save_checkpoint(path=os.path.join(self.args.ckpt_dir, f'checkpoint_{i}.pth.tar'))
+            data_module = DataModule(examples, batch_size=self.args.batch_size)
+            
+            logger = pl.loggers.TensorBoardLogger(save_dir=self.args.logs_dir, name=f'iter_{i}')
+            trainer = pl.Trainer(
+                logger=logger,
+                accelerator='gpu',
+                max_epochs=self.args.num_epochs,
+            )
+            trainer.fit(self.nnet, data_module)

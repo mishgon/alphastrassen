@@ -116,7 +116,7 @@ class ValueHead(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, num_quantiles)
 
     def forward(self, x):
-        return self.fc2(self.relu(self.fc1(x)))
+        return self.fc2(self.relu(self.fc1(x)))  # (bs, num_quantiles)
 
 
 class NeuralNet(pl.LightningDataModule):
@@ -131,11 +131,25 @@ class NeuralNet(pl.LightningDataModule):
         e = self.torso(s)
         return self.policy_head(e), self.value_head(e)
 
+    def quantile_regression_loss(self, quantiles, target):
+        num_quantiles = quantiles.shape[1]
+        tau = (torch.arange(num_quantiles).to(quantiles) + 0.5) / num_quantiles
+        
+        target = target.unsqueeze(1)
+        weights = torch.where(quantiles > target, tau, 1 - tau)
+        return torch.mean(weights * F.huber_loss(quantiles, target, reduction='none'))
+
     def train_step(self, batch, batch_idx=None):
         s, pi, v = batch
         logits, quantiles = self.forward(s)
-        
+
         policy_loss = F.cross_entropy(logits, pi)
+        self.log('policy_loss', policy_loss, on_epoch=True)
+
+        value_loss = self.quantile_regression_loss(quantiles, v)
+        self.log('value_loss', value_loss, on_epoch=True)
+
+        return policy_loss + value_loss
 
     def predict(self, state: State) -> Tuple[np.ndarray, float]:
         s = torch.tensor(state.tensor, dtype=torch.float32, device=self.device)[None]
