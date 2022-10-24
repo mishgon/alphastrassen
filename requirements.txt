@@ -1,0 +1,2 @@
+pytorch-lightning==1.7.1
+jupyter==1.0.0
