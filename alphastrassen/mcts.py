@@ -1,6 +1,8 @@
 from typing import *
+from tqdm import tqdm
 import numpy as np
 
+from .nnet import NeuralNet
 from .environment import State, Environment
 
 
@@ -8,10 +10,19 @@ class MCTS:
     """This class handles a MCTS tree.
     """
 
-    def __init__(self, environment: Environment, nnet, args):
+    def __init__(
+            self,
+            environment: Environment,
+            nnet: NeuralNet,
+            num_simulations: int,
+            max_num_steps: int,
+            cpuct: float = 1.0,
+    ):
         self.environment = environment
         self.nnet = nnet
-        self.args = args
+        self.num_simulations = num_simulations
+        self.max_num_steps = max_num_steps
+        self.cpuct = cpuct
 
         # transposition tables
         self.N: Dict[str, np.ndarray] = {}
@@ -27,7 +38,7 @@ class MCTS:
             probs: a policy vector where the probability of the ith action is
                    proportional to Nsa[(s,a)] ** (1 / tau)
         """
-        for _ in range(self.args.num_mcts_simulations):
+        for _ in range(self.num_simulations):
             self.run_simulation(state)
 
         s = state.to_str()
@@ -56,7 +67,7 @@ class MCTS:
                 break
 
             # pick the action with the highest upper confidence bound
-            a = np.argmax(self.Q[s] + self.args.cpuct * self.P[s] * np.sqrt(np.sum(self.N[s])) / (1 + self.N[s]))
+            a = np.argmax(self.Q[s] + self.cpuct * self.P[s] * np.sqrt(np.sum(self.N[s])) / (1 + self.N[s]))
 
             states.append(s)
             actions.append(a)
@@ -66,7 +77,7 @@ class MCTS:
             state = self.environment.get_next_state(state, a)
             num_steps += 1
 
-            if num_steps >= self.args.max_num_steps or self.environment.is_terminal(state):
+            if num_steps >= self.max_num_steps or self.environment.is_terminal(state):
                 cumulative_reward += self.environment.get_final_reward(state)
                 break
 
