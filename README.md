@@ -1,4 +1,4 @@
-# alphastrassen
+# DISCLAIMER: the code is not working properly! If you still consider using, be prepated to debug it thoroughly.
 Reproduction of AlphaTensor paper for 2x2 matrices. Parts of code are inspired by [this repo](https://github.com/suragnair/alpha-zero-general/blob/master/Coach.py), but strongly refactored.
 
 ## Requirements
